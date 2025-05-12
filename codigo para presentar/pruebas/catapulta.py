@@ -4,7 +4,9 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import json
+from PIL import Image, ImageTk
 import matplotlib.animation as animation
+from matplotlib.widgets import Slider
 import os
 import time
 
@@ -13,19 +15,11 @@ class TiroParabolicoApp:
         self.root = root
         self.root.title("Simulador de Tiro Parabólico Avanzado")
         self.root.geometry("1100x750")
-        
-        # Configure styles
         self.style = ttk.Style()
         self.style.configure('TNotebook.Tab', font=('Helvetica', 10, 'bold'))
         self.style.configure('Accent.TButton', font=('Helvetica', 10, 'bold'), foreground='blue')
         
-        # Initialize variables
-        self.initialize_variables()
-        self.cargar_historial()
-        self.crear_interfaz()
-    
-    def initialize_variables(self):
-        # Main trajectory variables
+        # Variables de control
         self.datos = {
             'x0': tk.DoubleVar(value=0),
             'y0': tk.DoubleVar(value=0),
@@ -41,7 +35,7 @@ class TiroParabolicoApp:
             'comparar': tk.BooleanVar(value=False)
         }
         
-        # Comparison trajectory variables
+        # Variables para el segundo tiro (comparación)
         self.datos_comparacion = {
             'x0': tk.DoubleVar(value=0),
             'y0': tk.DoubleVar(value=0),
@@ -62,46 +56,75 @@ class TiroParabolicoApp:
         self.animacion = None
         self.historial = []
         self.historial_file = "historial_simulaciones.json"
+        
+        # Cargar historial si existe
+        self.cargar_historial()
+        
+        self.crear_interfaz()
     
     def crear_interfaz(self):
-        # Create notebook (tabs)
+        # Notebook (pestañas)
         notebook = ttk.Notebook(self.root)
         notebook.pack(fill='both', expand=True)
         
-        # Create tabs
-        self.crear_pestana_entrada(notebook)
-        self.crear_pestana_resultados(notebook)
-        self.crear_pestana_graficos(notebook)
-        self.crear_pestana_historial(notebook)
+        # Pestaña de Entrada de Datos
+        frame_entrada = ttk.Frame(notebook)
+        notebook.add(frame_entrada, text="Datos de Entrada")
         
-        # Create toolbar
+        # Panel de parámetros básicos
+        self.crear_panel_basico(frame_entrada)
+        
+        # Panel de resistencia del aire
+        self.crear_panel_resistencia(frame_entrada)
+        
+        # Panel de comparación
+        self.crear_panel_comparacion(frame_entrada)
+        
+        # Panel de unidades
+        self.crear_panel_unidades(frame_entrada)
+        
+        # Pestaña de Resultados
+        frame_resultados = ttk.Frame(notebook)
+        notebook.add(frame_resultados, text="Resultados")
+        
+        # Panel de resultados
+        self.crear_panel_resultados(frame_resultados)
+        
+        # Pestaña de Gráficos
+        frame_graficos = ttk.Frame(notebook)
+        notebook.add(frame_graficos, text="Gráficos")
+        
+        # Panel de gráficos
+        self.crear_panel_graficos(frame_graficos)
+        
+        # Pestaña de Historial
+        frame_historial = ttk.Frame(notebook)
+        notebook.add(frame_historial, text="Historial")
+        
+        # Panel de historial
+        self.crear_panel_historial(frame_historial)
+        
+        # Barra de herramientas
         self.crear_barra_herramientas()
-    
-    def crear_pestana_entrada(self, notebook):
-        frame = ttk.Frame(notebook)
-        notebook.add(frame, text="Datos de Entrada")
-        
-        # Create panels
-        self.crear_panel_basico(frame)
-        self.crear_panel_resistencia(frame)
-        self.crear_panel_comparacion(frame)
-        self.crear_panel_unidades(frame)
     
     def crear_panel_basico(self, parent):
         frame = ttk.LabelFrame(parent, text="Parámetros Básicos", padding=10)
         frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
         
-        entries = [
-            ("Posición inicial x0:", 'x0'),
-            ("Posición inicial y0:", 'y0'),
-            ("Velocidad inicial:", 'v0'),
-            ("Ángulo de lanzamiento:", 'angulo'),
-            ("Gravedad:", 'g')
-        ]
+        ttk.Label(frame, text="Posición inicial x0:").grid(row=0, column=0, sticky="w")
+        ttk.Entry(frame, textvariable=self.datos['x0']).grid(row=0, column=1)
         
-        for i, (text, var) in enumerate(entries):
-            ttk.Label(frame, text=text).grid(row=i, column=0, sticky="w")
-            ttk.Entry(frame, textvariable=self.datos[var]).grid(row=i, column=1)
+        ttk.Label(frame, text="Posición inicial y0:").grid(row=1, column=0, sticky="w")
+        ttk.Entry(frame, textvariable=self.datos['y0']).grid(row=1, column=1)
+        
+        ttk.Label(frame, text="Velocidad inicial:").grid(row=2, column=0, sticky="w")
+        ttk.Entry(frame, textvariable=self.datos['v0']).grid(row=2, column=1)
+        
+        ttk.Label(frame, text="Ángulo de lanzamiento:").grid(row=3, column=0, sticky="w")
+        ttk.Entry(frame, textvariable=self.datos['angulo']).grid(row=3, column=1)
+        
+        ttk.Label(frame, text="Gravedad:").grid(row=4, column=0, sticky="w")
+        ttk.Entry(frame, textvariable=self.datos['g']).grid(row=4, column=1)
         
         ttk.Checkbutton(frame, text="Considerar resistencia del aire", 
                        variable=self.datos['resistencia'], 
@@ -111,17 +134,19 @@ class TiroParabolicoApp:
         self.frame_resistencia = ttk.LabelFrame(parent, text="Parámetros de Resistencia del Aire", padding=10)
         self.frame_resistencia.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
         
-        entries = [
-            ("Masa del proyectil:", 'masa'),
-            ("Coeficiente de arrastre:", 'coef_arrastre'),
-            ("Área transversal:", 'area'),
-            ("Densidad del aire:", 'densidad_aire')
-        ]
+        ttk.Label(self.frame_resistencia, text="Masa del proyectil:").grid(row=0, column=0, sticky="w")
+        ttk.Entry(self.frame_resistencia, textvariable=self.datos['masa']).grid(row=0, column=1)
         
-        for i, (text, var) in enumerate(entries):
-            ttk.Label(self.frame_resistencia, text=text).grid(row=i, column=0, sticky="w")
-            ttk.Entry(self.frame_resistencia, textvariable=self.datos[var]).grid(row=i, column=1)
+        ttk.Label(self.frame_resistencia, text="Coeficiente de arrastre:").grid(row=1, column=0, sticky="w")
+        ttk.Entry(self.frame_resistencia, textvariable=self.datos['coef_arrastre']).grid(row=1, column=1)
         
+        ttk.Label(self.frame_resistencia, text="Área transversal:").grid(row=2, column=0, sticky="w")
+        ttk.Entry(self.frame_resistencia, textvariable=self.datos['area']).grid(row=2, column=1)
+        
+        ttk.Label(self.frame_resistencia, text="Densidad del aire:").grid(row=3, column=0, sticky="w")
+        ttk.Entry(self.frame_resistencia, textvariable=self.datos['densidad_aire']).grid(row=3, column=1)
+        
+        # Inicialmente oculto
         self.toggle_resistencia()
     
     def crear_panel_comparacion(self, parent):
@@ -132,23 +157,26 @@ class TiroParabolicoApp:
                        variable=self.datos['comparar'], 
                        command=self.toggle_comparacion).grid(row=0, column=0, columnspan=2, pady=5)
         
+        # Frame para los parámetros de comparación (inicialmente oculto)
         self.frame_comparacion_params = ttk.Frame(self.frame_comparacion)
         self.frame_comparacion_params.grid(row=1, column=0, columnspan=2, sticky="nsew")
         
-        entries = [
-            ("Posición inicial x0:", 'x0'),
-            ("Posición inicial y0:", 'y0'),
-            ("Velocidad inicial:", 'v0'),
-            ("Ángulo de lanzamiento:", 'angulo')
-        ]
+        ttk.Label(self.frame_comparacion_params, text="Posición inicial x0:").grid(row=0, column=0, sticky="w")
+        ttk.Entry(self.frame_comparacion_params, textvariable=self.datos_comparacion['x0']).grid(row=0, column=1)
         
-        for i, (text, var) in enumerate(entries):
-            ttk.Label(self.frame_comparacion_params, text=text).grid(row=i, column=0, sticky="w")
-            ttk.Entry(self.frame_comparacion_params, textvariable=self.datos_comparacion[var]).grid(row=i, column=1)
+        ttk.Label(self.frame_comparacion_params, text="Posición inicial y0:").grid(row=1, column=0, sticky="w")
+        ttk.Entry(self.frame_comparacion_params, textvariable=self.datos_comparacion['y0']).grid(row=1, column=1)
+        
+        ttk.Label(self.frame_comparacion_params, text="Velocidad inicial:").grid(row=2, column=0, sticky="w")
+        ttk.Entry(self.frame_comparacion_params, textvariable=self.datos_comparacion['v0']).grid(row=2, column=1)
+        
+        ttk.Label(self.frame_comparacion_params, text="Ángulo de lanzamiento:").grid(row=3, column=0, sticky="w")
+        ttk.Entry(self.frame_comparacion_params, textvariable=self.datos_comparacion['angulo']).grid(row=3, column=1)
         
         ttk.Checkbutton(self.frame_comparacion_params, text="Resistencia del aire", 
                        variable=self.datos_comparacion['resistencia']).grid(row=4, column=0, columnspan=2, pady=5)
         
+        # Inicialmente oculto
         self.toggle_comparacion()
     
     def crear_panel_unidades(self, parent):
@@ -163,27 +191,30 @@ class TiroParabolicoApp:
                        variable=self.datos['unidades'], value="imperial",
                        command=self.actualizar_unidades).grid(row=1, column=0, sticky="w")
     
-    def crear_pestana_resultados(self, notebook):
-        frame = ttk.Frame(notebook)
-        notebook.add(frame, text="Resultados")
-        
-        # Create scrollable frame
-        canvas = tk.Canvas(frame)
-        scrollbar = ttk.Scrollbar(frame, orient="vertical", command=canvas.yview)
+    def crear_panel_resultados(self, parent):
+        # Frame principal con scroll
+        canvas = tk.Canvas(parent)
+        scrollbar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
         scrollable_frame = ttk.Frame(canvas)
         
-        scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(
+                scrollregion=canvas.bbox("all")
+            )
+        )
+        
         canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
         
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         
-        # Results content
+        # Contenido de resultados
         self.resultados_text = tk.Text(scrollable_frame, wrap=tk.WORD, height=20, width=80)
         self.resultados_text.pack(padx=10, pady=10, fill="both", expand=True)
         
-        # Time query frame
+        # Frame de consulta de tiempo
         frame_consulta = ttk.LabelFrame(scrollable_frame, text="Consulta por Tiempo", padding=10)
         frame_consulta.pack(fill="x", padx=10, pady=5)
         
@@ -196,118 +227,60 @@ class TiroParabolicoApp:
         self.consulta_resultado = ttk.Label(scrollable_frame, text="", wraplength=500)
         self.consulta_resultado.pack(padx=10, pady=5)
         
-        # Energy frame
+        # Frame de energía
         frame_energia = ttk.LabelFrame(scrollable_frame, text="Energías", padding=10)
         frame_energia.pack(fill="x", padx=10, pady=5)
         
         self.energia_text = tk.Text(frame_energia, wrap=tk.WORD, height=5, width=80)
         self.energia_text.pack(fill="both", expand=True)
     
-    def crear_pestana_graficos(self, notebook):
-        frame = ttk.Frame(notebook)
-        notebook.add(frame, text="Gráficos")
-        
-        # Create figure and canvas
+    def crear_panel_graficos(self, parent):
         self.figura = plt.Figure(figsize=(8, 4), dpi=100)
         self.ax = self.figura.add_subplot(111)
         
-        # Main frame
-        frame_principal = ttk.Frame(frame)
-        frame_principal.pack(fill="both", expand=True)
-        
-        # Canvas for the plot
-        self.canvas = FigureCanvasTkAgg(self.figura, master=frame_principal)
+        self.canvas = FigureCanvasTkAgg(self.figura, master=parent)
         self.canvas.get_tk_widget().pack(fill="both", expand=True)
         
-        # Controls frame
-        frame_controles = ttk.Frame(frame_principal)
+        # Controles del gráfico
+        frame_controles = ttk.Frame(parent)
         frame_controles.pack(fill="x", padx=10, pady=5)
         
-        # Point information frame
-        self.frame_info = ttk.LabelFrame(frame_principal, text="Información del Punto", padding=10)
-        self.frame_info.pack(fill="x", padx=10, pady=5)
-        
-        # Labels for trajectory 1 (blue)
-        ttk.Label(self.frame_info, text="Trayectoria 1 (Azul):").pack(anchor="w")
-        self.lbl_posicion1 = ttk.Label(self.frame_info, text="Posición: (0.00, 0.00) m | Tiempo: 0.00 s")
-        self.lbl_posicion1.pack(anchor="w")
-        self.lbl_velocidad1 = ttk.Label(self.frame_info, text="Velocidad: (0.00, 0.00) m/s | Magnitud: 0.00 m/s")
-        self.lbl_velocidad1.pack(anchor="w")
-        
-        # Separator
-        ttk.Separator(self.frame_info, orient='horizontal').pack(fill='x', pady=5)
-        
-        # Labels for trajectory 2 (red)
-        self.lbl_trayectoria2 = ttk.Label(self.frame_info, text="Trayectoria 2 (Roja):")
-        self.lbl_posicion2 = ttk.Label(self.frame_info, text="Posición: (0.00, 0.00) m | Tiempo: 0.00 s")
-        self.lbl_velocidad2 = ttk.Label(self.frame_info, text="Velocidad: (0.00, 0.00) m/s | Magnitud: 0.00 m/s")
-        
-        # Slider for trajectory 1 (blue)
-        self.slider_trayectoria_frame = ttk.Frame(frame_controles)
-        self.slider_trayectoria_frame.pack(fill="x", pady=5)
-        
-        ttk.Label(self.slider_trayectoria_frame, text="Posición trayectoria 1:").pack(side="left")
-        self.slider_trayectoria = ttk.Scale(
-            self.slider_trayectoria_frame,
-            from_=0,
-            to=100,
-            orient="horizontal",
-            command=self.actualizar_punto_trayectoria
-        )
-        self.slider_trayectoria.pack(side="left", expand=True, fill="x", padx=5)
-        
-        # Slider for trajectory 2 (red) - initially hidden
-        self.slider_comparacion_frame = ttk.Frame(frame_controles)
-        ttk.Label(self.slider_comparacion_frame, text="Posición trayectoria 2:").pack(side="left")
-        self.slider_comparacion = ttk.Scale(
-            self.slider_comparacion_frame,
-            from_=0,
-            to=100,
-            orient="horizontal",
-            command=self.actualizar_punto_comparacion
-        )
-        self.slider_comparacion.pack(side="left", expand=True, fill="x", padx=5)
-        
-        # Control buttons
         ttk.Button(frame_controles, text="Exportar Gráfico", command=self.exportar_grafico).pack(side="left", padx=5)
         ttk.Button(frame_controles, text="Animación", command=self.toggle_animacion).pack(side="left", padx=5)
         
-        # Animation speed slider
-        self.slider_velocidad_frame = ttk.Frame(frame_controles)
-        self.slider_velocidad_frame.pack(side="left", padx=10)
+        # Slider para controlar la velocidad de animación
+        self.slider_frame = ttk.Frame(frame_controles)
+        self.slider_frame.pack(side="left", padx=10)
         
-        ttk.Label(self.slider_velocidad_frame, text="Velocidad:").pack(side="left")
+        ttk.Label(self.slider_frame, text="Velocidad:").pack(side="left")
         self.velocidad_animacion = tk.IntVar(value=50)
-        ttk.Scale(
-            self.slider_velocidad_frame,
-            from_=1,
-            to=100,
-            variable=self.velocidad_animacion,
-            orient="horizontal",
-            length=100
-        ).pack(side="left")
+        ttk.Scale(self.slider_frame, from_=1, to=100, variable=self.velocidad_animacion, 
+                 orient="horizontal", length=100).pack(side="left")
     
-    def crear_pestana_historial(self, notebook):
-        frame = ttk.Frame(notebook)
-        notebook.add(frame, text="Historial")
-        
-        # Create scrollable frame
-        canvas = tk.Canvas(frame)
-        scrollbar = ttk.Scrollbar(frame, orient="vertical", command=canvas.yview)
+    def crear_panel_historial(self, parent):
+        # Frame principal con scroll
+        canvas = tk.Canvas(parent)
+        scrollbar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
         scrollable_frame = ttk.Frame(canvas)
         
-        scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(
+                scrollregion=canvas.bbox("all")
+            )
+        )
+        
         canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
         
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         
-        # History content
+        # Contenido del historial
         self.historial_listbox = tk.Listbox(scrollable_frame, width=100, height=20)
         self.historial_listbox.pack(padx=10, pady=10, fill="both", expand=True)
         
-        # History buttons
+        # Botones de historial
         frame_botones = ttk.Frame(scrollable_frame)
         frame_botones.pack(fill="x", padx=10, pady=5)
         
@@ -315,6 +288,7 @@ class TiroParabolicoApp:
         ttk.Button(frame_botones, text="Eliminar Selección", command=self.eliminar_del_historial).pack(side="left", padx=5)
         ttk.Button(frame_botones, text="Limpiar Historial", command=self.limpiar_historial).pack(side="right", padx=5)
         
+        # Actualizar lista de historial
         self.actualizar_lista_historial()
     
     def crear_barra_herramientas(self):
@@ -348,15 +322,18 @@ class TiroParabolicoApp:
     def actualizar_unidades(self):
         sistema = self.datos['unidades'].get()
         if sistema == "métrico":
-            pass  # Convert from imperial to metric if needed
+            # Convertir de imperial a métrico si es necesario
+            pass
         else:
-            pass  # Convert from metric to imperial if needed
+            # Convertir de métrico a imperial si es necesario
+            pass
     
     def validar_datos(self, datos=None, es_comparacion=False):
         if datos is None:
             datos = {k: v.get() for k, v in self.datos.items() if k not in ['unidades', 'comparar']}
         
         try:
+            # Validar que los valores sean positivos donde corresponda
             if datos['v0'] <= 0:
                 raise ValueError("La velocidad inicial debe ser positiva")
                 
@@ -378,42 +355,49 @@ class TiroParabolicoApp:
             return False
     
     def calcular_trayectoria(self):
+        # Validar datos principales
         if not self.validar_datos():
             return
         
+        # Validar datos de comparación si está activado
         if self.datos['comparar'].get():
             datos_comparacion = {k: v.get() for k, v in self.datos_comparacion.items()}
             if not self.validar_datos(datos_comparacion, es_comparacion=True):
                 return
         
-        # Calculate main trajectory
+        # Obtener datos principales
         datos = {k: v.get() for k, v in self.datos.items() if k not in ['unidades', 'comparar']}
         datos['angulo'] = np.radians(datos['angulo'])
+        
+        # Calcular trayectoria principal
         self.resultados = self.calcular_trayectoria_individual(datos)
         
-        # Calculate comparison trajectory if enabled
+        # Calcular trayectoria de comparación si está activado
         if self.datos['comparar'].get():
             datos_comparacion = {k: v.get() for k, v in self.datos_comparacion.items()}
             datos_comparacion['angulo'] = np.radians(datos_comparacion['angulo'])
             self.resultados_comparacion = self.calcular_trayectoria_individual(datos_comparacion)
         
+        # Actualizar interfaz
         self.actualizar_resultados(datos)
         self.actualizar_grafico(datos)
+        
+        # Guardar en historial
         self.guardar_en_historial(datos)
     
     def calcular_trayectoria_individual(self, datos):
         resultados = {}
         
-        # Vector decomposition
+        # Descomposición vectorial
         v0x, v0y = descomposicion_vectorial(datos['v0'], datos['angulo'])
         resultados['v0x'], resultados['v0y'] = v0x, v0y
         
-        # Basic calculations
+        # Cálculos básicos
         resultados['t_vuelo'] = tiempo_vuelo(v0y, datos['g'], datos['y0'])
         resultados['alcance'] = alcance_maximo(v0x, resultados['t_vuelo'])
         resultados['altura_max'] = datos['y0'] + altura_maxima(v0y, datos['g'])
         
-        # Simulation
+        # Simulación
         if datos['resistencia']:
             x, y, tiempos = movimiento_con_resistencia(
                 datos['x0'], datos['y0'], v0x, v0y, 
@@ -434,7 +418,7 @@ class TiroParabolicoApp:
         resultados['y'] = y
         resultados['tiempos'] = np.linspace(0, resultados['t_vuelo'], len(x))
         
-        # Calculate energies
+        # Calcular energías
         resultados['energias'] = self.calcular_energias(datos, resultados)
         
         return resultados
@@ -447,7 +431,7 @@ class TiroParabolicoApp:
         }
         
         g = datos['g']
-        masa = datos['masa'] if datos['resistencia'] else 1  # Fictitious mass if no resistance
+        masa = datos['masa'] if datos['resistencia'] else 1  # Masa ficticia si no hay resistencia
         
         for i in range(len(resultados['x'])):
             if i == 0:
@@ -498,6 +482,7 @@ class TiroParabolicoApp:
         self.resultados_text.delete(1.0, tk.END)
         self.resultados_text.insert(tk.END, informe)
         
+        # Actualizar energías
         self.actualizar_energias(datos)
     
     def actualizar_energias(self, datos):
@@ -527,108 +512,22 @@ class TiroParabolicoApp:
         
         self.ax.clear()
         
-        # Plot main trajectory (blue)
+        # Graficar trayectoria principal
         self.ax.plot(self.resultados['x'], self.resultados['y'], 'b-', label="Trayectoria 1")
-        self.ax.plot(datos['x0'], datos['y0'], 'bo', label="Punto de lanzamiento 1")
+        self.ax.plot(0, datos['y0'], 'bo', label="Punto de lanzamiento 1")
         self.ax.plot(self.resultados['alcance'], 0, 'bx', label="Punto de impacto 1")
         
-        # Show/hide comparison elements
+        # Graficar trayectoria de comparación si existe
         if self.datos['comparar'].get() and self.resultados_comparacion:
-            # Plot comparison trajectory (red)
             self.ax.plot(self.resultados_comparacion['x'], self.resultados_comparacion['y'], 'r-', label="Trayectoria 2")
             self.ax.plot(self.datos_comparacion['x0'].get(), self.datos_comparacion['y0'].get(), 'ro', label="Punto de lanzamiento 2")
             self.ax.plot(self.resultados_comparacion['alcance'], 0, 'rx', label="Punto de impacto 2")
-            
-            # Show slider and labels for trajectory 2
-            self.slider_comparacion_frame.pack(fill="x", pady=5)
-            self.lbl_trayectoria2.pack(anchor="w")
-            self.lbl_posicion2.pack(anchor="w")
-            self.lbl_velocidad2.pack(anchor="w")
-        else:
-            # Hide comparison elements
-            self.slider_comparacion_frame.pack_forget()
-            self.lbl_trayectoria2.pack_forget()
-            self.lbl_posicion2.pack_forget()
-            self.lbl_velocidad2.pack_forget()
         
         self.ax.set_title("Trayectoria del Proyectil")
         self.ax.set_xlabel("Distancia (m)")
         self.ax.set_ylabel("Altura (m)")
         self.ax.grid(True)
         self.ax.legend()
-        
-        # Configure sliders
-        self.slider_trayectoria.set(0)
-        if self.datos['comparar'].get() and self.resultados_comparacion:
-            self.slider_comparacion.set(0)
-        
-        self.actualizar_punto_trayectoria(0)
-        if self.datos['comparar'].get() and self.resultados_comparacion:
-            self.actualizar_punto_comparacion(0)
-        
-        self.canvas.draw()
-    
-    def actualizar_punto_trayectoria(self, valor):
-        if not hasattr(self, 'resultados') or not self.resultados:
-            return
-        
-        idx = int(float(valor) / 100 * (len(self.resultados['x']) - 1))
-        idx = max(0, min(idx, len(self.resultados['x']) - 1))
-        
-        x = self.resultados['x'][idx]
-        y = self.resultados['y'][idx]
-        t = self.resultados['tiempos'][idx]
-        
-        if idx == 0:
-            vx = self.resultados['v0x']
-            vy = self.resultados['v0y']
-        else:
-            dt = self.resultados['tiempos'][idx] - self.resultados['tiempos'][idx-1]
-            vx = (self.resultados['x'][idx] - self.resultados['x'][idx-1]) / dt
-            vy = (self.resultados['y'][idx] - self.resultados['y'][idx-1]) / dt
-        
-        velocidad_magnitud = np.sqrt(vx**2 + vy**2)
-        angulo = np.degrees(np.arctan2(vy, vx))
-        
-        self.lbl_posicion1.config(text=f"Posición: ({x:.2f}, {y:.2f}) m | Tiempo: {t:.2f} s")
-        self.lbl_velocidad1.config(text=f"Velocidad: ({vx:.2f}, {vy:.2f}) m/s | Magnitud: {velocidad_magnitud:.2f} m/s")
-        
-        if not hasattr(self, 'punto_interactivo'):
-            self.punto_interactivo, = self.ax.plot([x], [y], 'ro', markersize=8, label="Posición actual 1")
-        else:
-            self.punto_interactivo.set_data([x], [y])
-        
-        self.canvas.draw()
-    
-    def actualizar_punto_comparacion(self, valor):
-        if not hasattr(self, 'resultados_comparacion') or not self.resultados_comparacion:
-            return
-        
-        idx = int(float(valor) / 100 * (len(self.resultados_comparacion['x']) - 1))
-        idx = max(0, min(idx, len(self.resultados_comparacion['x']) - 1))
-        
-        x = self.resultados_comparacion['x'][idx]
-        y = self.resultados_comparacion['y'][idx]
-        t = self.resultados_comparacion['tiempos'][idx]
-        
-        if idx == 0:
-            vx = self.resultados_comparacion['v0x']
-            vy = self.resultados_comparacion['v0y']
-        else:
-            dt = self.resultados_comparacion['tiempos'][idx] - self.resultados_comparacion['tiempos'][idx-1]
-            vx = (self.resultados_comparacion['x'][idx] - self.resultados_comparacion['x'][idx-1]) / dt
-            vy = (self.resultados_comparacion['y'][idx] - self.resultados_comparacion['y'][idx-1]) / dt
-        
-        velocidad_magnitud = np.sqrt(vx**2 + vy**2)
-        angulo = np.degrees(np.arctan2(vy, vx))
-        
-        self.lbl_posicion2.config(text=f"Posición: ({x:.2f}, {y:.2f}) m | Tiempo: {t:.2f} s")
-        self.lbl_velocidad2.config(text=f"Velocidad: ({vx:.2f}, {vy:.2f}) m/s | Magnitud: {velocidad_magnitud:.2f} m/s")
-        
-        if not hasattr(self, 'punto_comparacion'):
-            self.punto_comparacion, = self.ax.plot([x], [y], 'go', markersize=8, label="Posición actual 2")
-        else:
-            self.punto_comparacion.set_data([x], [y])
         
         self.canvas.draw()
     
@@ -637,38 +536,31 @@ class TiroParabolicoApp:
             messagebox.showwarning("Advertencia", "No hay datos para animar. Calcule primero una trayectoria.")
             return
             
-        # Animation setup
-        self.linea_animada, = self.ax.plot([], [], 'ko', markersize=8)
+        # Configurar animación
+        self.linea_animada, = self.ax.plot([], [], 'go', markersize=8)
         self.tiempo_texto = self.ax.text(0.02, 0.95, '', transform=self.ax.transAxes)
         
+        # Función de inicialización
         def init():
             self.linea_animada.set_data([], [])
             self.tiempo_texto.set_text('')
             return self.linea_animada, self.tiempo_texto
         
+        # Función de animación
         def animate(i):
             if i >= len(self.resultados['x']):
                 i = len(self.resultados['x']) - 1
                 
-            x = self.resultados['x'][i]
-            y = self.resultados['y'][i]
-            t = self.resultados['tiempos'][i]
-            
-            self.linea_animada.set_data(x, y)
-            self.tiempo_texto.set_text(f'Tiempo: {t:.2f} s')
-            
-            # Update slider and labels
-            self.slider_trayectoria.set(i / len(self.resultados['x']) * 100)
-            self.actualizar_punto_trayectoria(i / len(self.resultados['x']) * 100)
-            
+            self.linea_animada.set_data(self.resultados['x'][i], self.resultados['y'][i])
+            self.tiempo_texto.set_text(f'Tiempo: {self.resultados["tiempos"][i]:.2f} s')
             return self.linea_animada, self.tiempo_texto
         
-        # Calculate interval based on speed slider
-        intervalo = 110 - self.velocidad_animacion.get()  # Invert value (1-100 to 110-10)
+        # Calcular intervalo basado en la velocidad del slider
+        intervalo = 110 - self.velocidad_animacion.get()  # Invertir el valor (1-100 a 110-10)
         
-        # Create animation
+        # Crear animación
         self.animacion = animation.FuncAnimation(
-            self.figura, animate, frames=len(self.resultados['x'])*2,  # Multiply by 2 for smoother animation
+            self.figura, animate, frames=len(self.resultados['x'])*2,  # Multiplicar por 2 para más suavidad
             init_func=init, blit=True, interval=intervalo, repeat=True
         )
         
@@ -679,7 +571,7 @@ class TiroParabolicoApp:
             self.animacion.event_source.stop()
             self.animacion = None
             
-            # Clean animation elements
+            # Limpiar elementos de animación
             if hasattr(self, 'linea_animada'):
                 self.linea_animada.remove()
             if hasattr(self, 'tiempo_texto'):
@@ -741,12 +633,14 @@ class TiroParabolicoApp:
                 contenido = self.resultados_text.get(1.0, tk.END) + "\n" + self.energia_text.get(1.0, tk.END)
                 
                 if filepath.endswith('.pdf'):
+                    # Exportar a PDF (requiere fpdf2)
                     try:
                         from fpdf import FPDF
                         pdf = FPDF()
                         pdf.add_page()
                         pdf.set_font("Arial", size=12)
                         
+                        # Dividir el texto en líneas que quepan en la página
                         for line in contenido.split('\n'):
                             pdf.cell(200, 10, txt=line, ln=1)
                         
@@ -755,6 +649,7 @@ class TiroParabolicoApp:
                         messagebox.showerror("Error", "Para exportar a PDF, instale fpdf2 con: pip install fpdf2")
                         return
                 else:
+                    # Exportar a texto plano
                     with open(filepath, 'w') as f:
                         f.write(contenido)
                 
@@ -781,7 +676,6 @@ class TiroParabolicoApp:
                 messagebox.showerror("Error", f"No se pudo guardar el gráfico:\n{str(e)}")
     
     def limpiar(self):
-        # Reset variables
         for var in self.datos.values():
             if isinstance(var, (tk.DoubleVar, tk.BooleanVar)):
                 if var == self.datos['resistencia']:
@@ -797,7 +691,7 @@ class TiroParabolicoApp:
                 else:
                     var.set(0)
         
-        # Reset comparison variables
+        # Limpiar datos de comparación
         for var in self.datos_comparacion.values():
             if isinstance(var, (tk.DoubleVar, tk.BooleanVar)):
                 if var == self.datos_comparacion['resistencia']:
@@ -809,48 +703,33 @@ class TiroParabolicoApp:
                 else:
                     var.set(0)
         
-        # Clear text fields
         self.resultados_text.delete(1.0, tk.END)
         self.energia_text.delete(1.0, tk.END)
         self.consulta_resultado.config(text="")
         self.tiempo_consulta.delete(0, tk.END)
         
-        # Clear plot
         if self.figura:
             self.ax.clear()
             self.canvas.draw()
         
-        # Stop animation
         if hasattr(self, 'animacion') and self.animacion:
             self.detener_animacion()
-        
-        # Clear interactive points
-        if hasattr(self, 'punto_interactivo'):
-            self.punto_interactivo.remove()
-            del self.punto_interactivo
-        
-        if hasattr(self, 'punto_comparacion'):
-            self.punto_comparacion.remove()
-            del self.punto_comparacion
-        
-        # Reset labels
-        self.lbl_posicion1.config(text="Posición: (0.00, 0.00) m | Tiempo: 0.00 s")
-        self.lbl_velocidad1.config(text="Velocidad: (0.00, 0.00) m/s | Magnitud: 0.00 m/s")
-        self.lbl_posicion2.config(text="Posición: (0.00, 0.00) m | Tiempo: 0.00 s")
-        self.lbl_velocidad2.config(text="Velocidad: (0.00, 0.00) m/s | Magnitud: 0.00 m/s")
     
     def modo_avanzado(self):
         ventana_avanzada = tk.Toplevel(self.root)
         ventana_avanzada.title("Modo Avanzado - Edición de Ecuaciones")
         ventana_avanzada.geometry("600x400")
         
+        # Frame principal
         frame_principal = ttk.Frame(ventana_avanzada)
         frame_principal.pack(fill="both", expand=True, padx=10, pady=10)
         
+        # Área de texto para ecuaciones
         ttk.Label(frame_principal, text="Editar ecuaciones del modelo:").pack(anchor="w")
         self.texto_ecuaciones = tk.Text(frame_principal, wrap=tk.WORD, height=15)
         self.texto_ecuaciones.pack(fill="both", expand=True, pady=5)
         
+        # Insertar ecuaciones actuales
         ecuaciones = """# Ecuaciones del modelo de tiro parabólico
 
 def descomposicion_vectorial(v0, theta):
@@ -896,6 +775,7 @@ def movimiento_con_resistencia(x0, y0, v0x, v0y, g, masa, coef_arrastre, area, d
 """
         self.texto_ecuaciones.insert(tk.END, ecuaciones)
         
+        # Botones
         frame_botones = ttk.Frame(frame_principal)
         frame_botones.pack(fill="x", pady=5)
         
@@ -904,9 +784,12 @@ def movimiento_con_resistencia(x0, y0, v0x, v0y, g, masa, coef_arrastre, area, d
         ttk.Button(frame_botones, text="Cancelar", command=ventana_avanzada.destroy).pack(side="right", padx=5)
     
     def guardar_ecuaciones(self):
+        # Aquí deberías implementar la lógica para guardar las ecuaciones editadas
+        # Esto es complejo porque implica modificar el código en tiempo de ejecución
         messagebox.showinfo("Información", "Esta funcionalidad es compleja y requiere implementación adicional.")
     
     def restaurar_ecuaciones(self):
+        # Restaurar ecuaciones predeterminadas
         pass
     
     def cargar_historial(self):
@@ -925,6 +808,7 @@ def movimiento_con_resistencia(x0, y0, v0x, v0y, g, masa, coef_arrastre, area, d
             pass
     
     def guardar_en_historial(self, datos):
+        # Crear entrada de historial
         entrada = {
             'timestamp': time.time(),
             'datos': datos,
@@ -935,12 +819,17 @@ def movimiento_con_resistencia(x0, y0, v0x, v0y, g, masa, coef_arrastre, area, d
             }
         }
         
+        # Agregar al historial
         self.historial.append(entrada)
         
+        # Mantener solo las últimas 50 entradas
         if len(self.historial) > 50:
             self.historial = self.historial[-50:]
         
+        # Guardar en archivo
         self.guardar_historial()
+        
+        # Actualizar lista
         self.actualizar_lista_historial()
     
     def actualizar_lista_historial(self):
@@ -966,6 +855,7 @@ def movimiento_con_resistencia(x0, y0, v0x, v0y, g, masa, coef_arrastre, area, d
         entrada = self.historial[indice]
         datos = entrada['datos']
         
+        # Cargar datos principales
         self.datos['x0'].set(datos['x0'])
         self.datos['y0'].set(datos['y0'])
         self.datos['v0'].set(datos['v0'])
@@ -979,6 +869,7 @@ def movimiento_con_resistencia(x0, y0, v0x, v0y, g, masa, coef_arrastre, area, d
             self.datos['area'].set(datos['area'])
             self.datos['densidad_aire'].set(datos['densidad_aire'])
         
+        # Calcular automáticamente
         self.calcular_trayectoria()
     
     def eliminar_del_historial(self):
@@ -998,7 +889,7 @@ def movimiento_con_resistencia(x0, y0, v0x, v0y, g, masa, coef_arrastre, area, d
             self.guardar_historial()
             self.actualizar_lista_historial()
 
-# Physics calculation functions
+# Funciones de cálculo
 def descomposicion_vectorial(v0, theta):
     return v0 * np.cos(theta), v0 * np.sin(theta)
 
@@ -1040,6 +931,7 @@ def movimiento_con_resistencia(x0, y0, v0x, v0y, g, masa, coef_arrastre, area, d
     
     return x, y, tiempos[:len(x)]
 
+# Iniciar aplicación
 if __name__ == "__main__":
     root = tk.Tk()
     app = TiroParabolicoApp(root)
