@@ -593,10 +593,26 @@ class TiroParabolicoApp:
         self.lbl_posicion1.config(text=f"Posición: ({x:.2f}, {y:.2f}) m | Tiempo: {t:.2f} s")
         self.lbl_velocidad1.config(text=f"Velocidad: ({vx:.2f}, {vy:.2f}) m/s | Magnitud: {velocidad_magnitud:.2f} m/s")
         
+        # Actualizar o crear el punto interactivo
         if not hasattr(self, 'punto_interactivo'):
             self.punto_interactivo, = self.ax.plot([x], [y], 'ro', markersize=8, label="Posición actual 1")
         else:
             self.punto_interactivo.set_data([x], [y])
+        
+        # Línea desde el punto de lanzamiento hasta la posición actual
+        x0 = self.datos['x0'].get()
+        y0 = self.datos['y0'].get()
+        if not hasattr(self, 'linea_trayectoria'):
+            self.linea_trayectoria, = self.ax.plot([x0, x], [y0, y], 'g--', linewidth=1, alpha=0.5)
+        else:
+            self.linea_trayectoria.set_data([x0, x], [y0, y])
+        
+        # Línea de dirección (vector velocidad)
+        scale = 0.5  # Escala para visualización del vector
+        if not hasattr(self, 'linea_direccion'):
+            self.linea_direccion, = self.ax.plot([x, x + vx*scale], [y, y + vy*scale], 'r-', linewidth=2, alpha=0.7)
+        else:
+            self.linea_direccion.set_data([x, x + vx*scale], [y, y + vy*scale])
         
         self.canvas.draw()
     
@@ -629,6 +645,21 @@ class TiroParabolicoApp:
             self.punto_comparacion, = self.ax.plot([x], [y], 'go', markersize=8, label="Posición actual 2")
         else:
             self.punto_comparacion.set_data([x], [y])
+        
+        # Línea desde el punto de lanzamiento hasta la posición actual (comparación)
+        x0_comp = self.datos_comparacion['x0'].get()
+        y0_comp = self.datos_comparacion['y0'].get()
+        if not hasattr(self, 'linea_trayectoria_comp'):
+            self.linea_trayectoria_comp, = self.ax.plot([x0_comp, x], [y0_comp, y], 'm--', linewidth=1, alpha=0.5)
+        else:
+            self.linea_trayectoria_comp.set_data([x0_comp, x], [y0_comp, y])
+        
+        # Línea de dirección (vector velocidad) para comparación
+        scale = 0.5
+        if not hasattr(self, 'linea_direccion_comp'):
+            self.linea_direccion_comp, = self.ax.plot([x, x + vx*scale], [y, y + vy*scale], 'c-', linewidth=2, alpha=0.7)
+        else:
+            self.linea_direccion_comp.set_data([x, x + vx*scale], [y, y + vy*scale])
         
         self.canvas.draw()
     
@@ -824,7 +855,7 @@ class TiroParabolicoApp:
         if hasattr(self, 'animacion') and self.animacion:
             self.detener_animacion()
         
-        # Clear interactive points
+        # Clear interactive points and lines
         if hasattr(self, 'punto_interactivo'):
             self.punto_interactivo.remove()
             del self.punto_interactivo
@@ -832,6 +863,22 @@ class TiroParabolicoApp:
         if hasattr(self, 'punto_comparacion'):
             self.punto_comparacion.remove()
             del self.punto_comparacion
+        
+        if hasattr(self, 'linea_trayectoria'):
+            self.linea_trayectoria.remove()
+            del self.linea_trayectoria
+        
+        if hasattr(self, 'linea_direccion'):
+            self.linea_direccion.remove()
+            del self.linea_direccion
+        
+        if hasattr(self, 'linea_trayectoria_comp'):
+            self.linea_trayectoria_comp.remove()
+            del self.linea_trayectoria_comp
+        
+        if hasattr(self, 'linea_direccion_comp'):
+            self.linea_direccion_comp.remove()
+            del self.linea_direccion_comp
         
         # Reset labels
         self.lbl_posicion1.config(text="Posición: (0.00, 0.00) m | Tiempo: 0.00 s")
