@@ -233,6 +233,8 @@ class TiroParabolicoApp:
         self.lbl_posicion1.pack(anchor="w")
         self.lbl_velocidad1 = ttk.Label(self.frame_info, text="Velocidad: (0.00, 0.00) m/s | Magnitud: 0.00 m/s")
         self.lbl_velocidad1.pack(anchor="w")
+        self.lbl_aceleracion1 = ttk.Label(self.frame_info, text="Aceleración: (0.00, -9.81) m/s² | Magnitud: 9.81 m/s²")
+        self.lbl_aceleracion1.pack(anchor="w")
         
         # Separator
         ttk.Separator(self.frame_info, orient='horizontal').pack(fill='x', pady=5)
@@ -241,6 +243,7 @@ class TiroParabolicoApp:
         self.lbl_trayectoria2 = ttk.Label(self.frame_info, text="Trayectoria 2 (Roja):")
         self.lbl_posicion2 = ttk.Label(self.frame_info, text="Posición: (0.00, 0.00) m | Tiempo: 0.00 s")
         self.lbl_velocidad2 = ttk.Label(self.frame_info, text="Velocidad: (0.00, 0.00) m/s | Magnitud: 0.00 m/s")
+        self.lbl_aceleracion2 = ttk.Label(self.frame_info, text="Aceleración: (0.00, -9.81) m/s² | Magnitud: 9.81 m/s²")
         
         # Slider for trajectory 1 (blue)
         self.slider_trayectoria_frame = ttk.Frame(frame_controles)
@@ -544,12 +547,14 @@ class TiroParabolicoApp:
             self.lbl_trayectoria2.pack(anchor="w")
             self.lbl_posicion2.pack(anchor="w")
             self.lbl_velocidad2.pack(anchor="w")
+            self.lbl_aceleracion2.pack(anchor="w")
         else:
             # Hide comparison elements
             self.slider_comparacion_frame.pack_forget()
             self.lbl_trayectoria2.pack_forget()
             self.lbl_posicion2.pack_forget()
             self.lbl_velocidad2.pack_forget()
+            self.lbl_aceleracion2.pack_forget()
         
         self.ax.set_title("Trayectoria del Proyectil")
         self.ax.set_xlabel("Distancia (m)")
@@ -582,16 +587,32 @@ class TiroParabolicoApp:
         if idx == 0:
             vx = self.resultados['v0x']
             vy = self.resultados['v0y']
-        else:
+            ax = 0
+            ay = -self.datos['g'].get()
+        elif idx == 1:
             dt = self.resultados['tiempos'][idx] - self.resultados['tiempos'][idx-1]
+            vx_prev = self.resultados['v0x']
+            vy_prev = self.resultados['v0y']
             vx = (self.resultados['x'][idx] - self.resultados['x'][idx-1]) / dt
             vy = (self.resultados['y'][idx] - self.resultados['y'][idx-1]) / dt
+            ax = (vx - vx_prev) / dt
+            ay = (vy - vy_prev) / dt
+        else:
+            dt = self.resultados['tiempos'][idx] - self.resultados['tiempos'][idx-1]
+            dt_prev = self.resultados['tiempos'][idx-1] - self.resultados['tiempos'][idx-2]
+            vx = (self.resultados['x'][idx] - self.resultados['x'][idx-1]) / dt
+            vy = (self.resultados['y'][idx] - self.resultados['y'][idx-1]) / dt
+            vx_prev = (self.resultados['x'][idx-1] - self.resultados['x'][idx-2]) / dt_prev
+            vy_prev = (self.resultados['y'][idx-1] - self.resultados['y'][idx-2]) / dt_prev
+            ax = (vx - vx_prev) / dt
+            ay = (vy - vy_prev) / dt
         
         velocidad_magnitud = np.sqrt(vx**2 + vy**2)
-        angulo = np.degrees(np.arctan2(vy, vx))
+        aceleracion_magnitud = np.sqrt(ax**2 + ay**2)
         
         self.lbl_posicion1.config(text=f"Posición: ({x:.2f}, {y:.2f}) m | Tiempo: {t:.2f} s")
         self.lbl_velocidad1.config(text=f"Velocidad: ({vx:.2f}, {vy:.2f}) m/s | Magnitud: {velocidad_magnitud:.2f} m/s")
+        self.lbl_aceleracion1.config(text=f"Aceleración: ({ax:.2f}, {ay:.2f}) m/s² | Magnitud: {aceleracion_magnitud:.2f} m/s²")
         
         # Actualizar o crear el punto interactivo
         if not hasattr(self, 'punto_interactivo'):
@@ -630,16 +651,32 @@ class TiroParabolicoApp:
         if idx == 0:
             vx = self.resultados_comparacion['v0x']
             vy = self.resultados_comparacion['v0y']
-        else:
+            ax = 0
+            ay = -self.datos_comparacion['g'].get()
+        elif idx == 1:
             dt = self.resultados_comparacion['tiempos'][idx] - self.resultados_comparacion['tiempos'][idx-1]
+            vx_prev = self.resultados_comparacion['v0x']
+            vy_prev = self.resultados_comparacion['v0y']
             vx = (self.resultados_comparacion['x'][idx] - self.resultados_comparacion['x'][idx-1]) / dt
             vy = (self.resultados_comparacion['y'][idx] - self.resultados_comparacion['y'][idx-1]) / dt
+            ax = (vx - vx_prev) / dt
+            ay = (vy - vy_prev) / dt
+        else:
+            dt = self.resultados_comparacion['tiempos'][idx] - self.resultados_comparacion['tiempos'][idx-1]
+            dt_prev = self.resultados_comparacion['tiempos'][idx-1] - self.resultados_comparacion['tiempos'][idx-2]
+            vx = (self.resultados_comparacion['x'][idx] - self.resultados_comparacion['x'][idx-1]) / dt
+            vy = (self.resultados_comparacion['y'][idx] - self.resultados_comparacion['y'][idx-1]) / dt
+            vx_prev = (self.resultados_comparacion['x'][idx-1] - self.resultados_comparacion['x'][idx-2]) / dt_prev
+            vy_prev = (self.resultados_comparacion['y'][idx-1] - self.resultados_comparacion['y'][idx-2]) / dt_prev
+            ax = (vx - vx_prev) / dt
+            ay = (vy - vy_prev) / dt
         
         velocidad_magnitud = np.sqrt(vx**2 + vy**2)
-        angulo = np.degrees(np.arctan2(vy, vx))
+        aceleracion_magnitud = np.sqrt(ax**2 + ay**2)
         
         self.lbl_posicion2.config(text=f"Posición: ({x:.2f}, {y:.2f}) m | Tiempo: {t:.2f} s")
         self.lbl_velocidad2.config(text=f"Velocidad: ({vx:.2f}, {vy:.2f}) m/s | Magnitud: {velocidad_magnitud:.2f} m/s")
+        self.lbl_aceleracion2.config(text=f"Aceleración: ({ax:.2f}, {ay:.2f}) m/s² | Magnitud: {aceleracion_magnitud:.2f} m/s²")
         
         if not hasattr(self, 'punto_comparacion'):
             self.punto_comparacion, = self.ax.plot([x], [y], 'go', markersize=8, label="Posición actual 2")
@@ -725,30 +762,27 @@ class TiroParabolicoApp:
                 raise ValueError("El tiempo no puede ser negativo")
                 
             datos = {k: v.get() for k, v in self.datos.items() if k not in ['unidades', 'comparar']}
-            datos['angulo'] = np.radians(datos['angulo'])
+            angulo = np.degrees(datos['angulo']) if 'angulo' in datos else datos['angulo']
             
-            if datos['resistencia']:
-                x, y, _ = movimiento_con_resistencia(
-                    datos['x0'], datos['y0'], self.resultados['v0x'], self.resultados['v0y'], 
-                    datos['g'], datos['masa'], datos['coef_arrastre'], datos['area'], 
-                    datos['densidad_aire'], t_max=t, dt=0.01
-                )
-                pos_x, pos_y = x[-1], y[-1]
-                vx = (x[-1] - x[-2]) / 0.01 if len(x) > 1 else self.resultados['v0x']
-                vy = (y[-1] - y[-2]) / 0.01 if len(y) > 1 else self.resultados['v0y']
-            else:
-                pos_x, pos_y, vx, vy = movimiento_parabolico(
-                    datos['x0'], datos['y0'], self.resultados['v0x'], self.resultados['v0y'], 
-                    datos['g'], t
-                )
+            # Calcular parametrización
+            param = parametrizacion_tiro_parabolico(
+                datos['x0'], datos['y0'], datos['v0'], angulo, 
+                datos['g'], t
+            )
             
-            if pos_y < 0:
+            if param['posicion'][1] < 0:
                 resultado = f"En t = {t:.2f} s: El proyectil ya ha impactado en el suelo."
             else:
                 resultado = (
                     f"En t = {t:.2f} s:\n"
-                    f"- Posición: ({pos_x:.2f}, {pos_y:.2f}) m\n"
-                    f"- Velocidad: ({vx:.2f}, {vy:.2f}) m/s"
+                    f"- Posición: ({param['posicion'][0]:.2f}, {param['posicion'][1]:.2f}) m\n"
+                    f"- Velocidad: ({param['velocidad'][0]:.2f}, {param['velocidad'][1]:.2f}) m/s\n"
+                    f"- Aceleración: ({param['aceleracion'][0]:.2f}, {param['aceleracion'][1]:.2f}) m/s²\n\n"
+                    f"Ecuaciones paramétricas:\n"
+                    f"x(t) = {param['ecuaciones']['x(t)']}\n"
+                    f"y(t) = {param['ecuaciones']['y(t)']}\n"
+                    f"vx(t) = {param['ecuaciones']['vx(t)']}\n"
+                    f"vy(t) = {param['ecuaciones']['vy(t)']}"
                 )
             
             self.consulta_resultado.config(text=resultado)
@@ -883,8 +917,10 @@ class TiroParabolicoApp:
         # Reset labels
         self.lbl_posicion1.config(text="Posición: (0.00, 0.00) m | Tiempo: 0.00 s")
         self.lbl_velocidad1.config(text="Velocidad: (0.00, 0.00) m/s | Magnitud: 0.00 m/s")
+        self.lbl_aceleracion1.config(text="Aceleración: (0.00, -9.81) m/s² | Magnitud: 9.81 m/s²")
         self.lbl_posicion2.config(text="Posición: (0.00, 0.00) m | Tiempo: 0.00 s")
         self.lbl_velocidad2.config(text="Velocidad: (0.00, 0.00) m/s | Magnitud: 0.00 m/s")
+        self.lbl_aceleracion2.config(text="Aceleración: (0.00, -9.81) m/s² | Magnitud: 9.81 m/s²")
     
     def modo_avanzado(self):
         ventana_avanzada = tk.Toplevel(self.root)
@@ -940,6 +976,34 @@ def movimiento_con_resistencia(x0, y0, v0x, v0y, g, masa, coef_arrastre, area, d
             break
     
     return x, y, tiempos[:len(x)]
+
+def parametrizacion_tiro_parabolico(x0, y0, v0, angulo, g, t):
+    \"\"\"
+    Devuelve la parametrización del tiro parabólico en el tiempo t
+    \"\"\"
+    ang_rad = np.radians(angulo)
+    v0x = v0 * np.cos(ang_rad)
+    v0y = v0 * np.sin(ang_rad)
+    
+    x = x0 + v0x * t
+    y = y0 + v0y * t - 0.5 * g * t**2
+    vx = v0x
+    vy = v0y - g * t
+    ax = 0
+    ay = -g
+    
+    return {
+        'posicion': (x, y),
+        'velocidad': (vx, vy),
+        'aceleracion': (ax, ay),
+        'tiempo': t,
+        'ecuaciones': {
+            'x(t)': f"{x0:.2f} + {v0x:.2f}·t",
+            'y(t)': f"{y0:.2f} + {v0y:.2f}·t - 0.5·{g:.2f}·t²",
+            'vx(t)': f"{v0x:.2f}",
+            'vy(t)': f"{v0y:.2f} - {g:.2f}·t"
+        }
+    }
 """
         self.texto_ecuaciones.insert(tk.END, ecuaciones)
         
@@ -1086,6 +1150,34 @@ def movimiento_con_resistencia(x0, y0, v0x, v0y, g, masa, coef_arrastre, area, d
             break
     
     return x, y, tiempos[:len(x)]
+
+def parametrizacion_tiro_parabolico(x0, y0, v0, angulo, g, t):
+    """
+    Devuelve la parametrización del tiro parabólico en el tiempo t
+    """
+    ang_rad = np.radians(angulo)
+    v0x = v0 * np.cos(ang_rad)
+    v0y = v0 * np.sin(ang_rad)
+    
+    x = x0 + v0x * t
+    y = y0 + v0y * t - 0.5 * g * t**2
+    vx = v0x
+    vy = v0y - g * t
+    ax = 0
+    ay = -g
+    
+    return {
+        'posicion': (x, y),
+        'velocidad': (vx, vy),
+        'aceleracion': (ax, ay),
+        'tiempo': t,
+        'ecuaciones': {
+            'x(t)': f"{x0:.2f} + {v0x:.2f}·t",
+            'y(t)': f"{y0:.2f} + {v0y:.2f}·t - 0.5·{g:.2f}·t²",
+            'vx(t)': f"{v0x:.2f}",
+            'vy(t)': f"{v0y:.2f} - {g:.2f}·t"
+        }
+    }
 
 if __name__ == "__main__":
     root = tk.Tk()
