@@ -44,16 +44,14 @@ FUNCIONALIDADES AVANZADAS:
 ESTRUCTURA DEL PROYECTO:
 ------------------------
 simulador-tiro-parabolico/
-├── catapulta.py          # Código principal
-├── requirements.txt      # Dependencias
-├── README.md             # Documentación
-└── historial.json        # Datos de simulaciones
+├── catapulta.py          
+├── README.md             
+└── historial.json        
 
 📌 NOTAS:
 • Se recomienda resolución mínima 1280x720px
 • Agregar capturas reales (screenshot.png)
 • Opcional: archivo LICENSE para licencia personalizada
 
-📝 LICENCIA: MIT (ver archivo LICENSE)
 🤝 Contribuciones bienvenidas
 """
